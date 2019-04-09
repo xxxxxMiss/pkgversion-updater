@@ -5,34 +5,36 @@ const path = require('path')
 const execa = require('execa')
 const _ = require('lodash')
 
-const pkgPath = path.join(process.cwd(), 'package.json')
-if (!fs.existsSync(pkgPath)) {
-  console.error(`The path: ${pkgPath} not contains package.json`)
-  process.exit(1)
-}
+module.exports = async () => {
+  const pkgPath = path.join(process.cwd(), 'package.json')
+  if (!fs.existsSync(pkgPath)) {
+    console.error(`The path: ${pkgPath} not contains package.json`)
+    process.exit(1)
+  }
 
-const package = require(pkgPath)
-const dependencies = _.get(package, 'dependencies')
-const devDependencies = _.get(package, 'devDependencies')
-const pkgManager = hasYarn() ? 'yarn' : 'npm'
+  const packageInfo = require(pkgPath)
+  const dependencies = _.get(packageInfo, 'dependencies')
+  const devDependencies = _.get(packageInfo, 'devDependencies')
+  const pkgManager = hasYarn() ? 'yarn' : 'npm'
 
-const commands = [Object.keys(dependencies), Object.keys(devDependencies)].map(
-  keys => {
+  const commands = [
+    Object.keys(dependencies),
+    Object.keys(devDependencies),
+  ].map(keys => {
     return keys.map(dep => {
       return execa(pkgManager, ['info', dep, 'version'])
     })
-  }
-)
+  })
 
-module.exports = async () => {
   const newDependencies = await getNewDeps(commands[0])
   const newDevDependencies = await getNewDeps(commands[1])
-  const newPackage = _.merge(package, {
+  const newPackage = _.merge(packageInfo, {
     dependencies: newDependencies,
     devDependencies: newDevDependencies,
   })
 
   fs.writeFileSync(pkgPath, JSON.stringify(newPackage, null, 2))
+  return newPackage
 }
 
 function getNewDeps(commands) {
